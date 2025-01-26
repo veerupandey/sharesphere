@@ -1,0 +1,69 @@
+# config/config.yaml
+
+# === Database Configuration ===
+db:
+  # Database URL following SQLAlchemy's format.
+  # For SQLite (default), the path is relative to the project root.
+  # Ensure that the specified path is correct and accessible.
+  url: "sqlite:///../sharesphere.db"  # Adjust the path as needed.
+
+# === File Upload Settings ===
+upload:
+  # Directory where uploaded files will be stored.
+  # This path is relative to the project root.
+  folder: "uploads"
+  
+  # List of allowed file extensions for uploads.
+  # Adjust based on your application's requirements.
+  allowed_extensions:
+    - png
+    - jpg
+    - jpeg
+    - gif
+    - pdf
+    - txt
+    - docx
+    - xlsx
+    - pptx
+    
+  # Maximum allowed file size for uploads in bytes.
+  # 52428800 bytes = 50 MB
+  max_file_size: 52428800  # 50 MB
+
+# === Logging Configuration ===
+logging:
+  # Directory where log files will be stored.
+  # Ensure that the application has write permissions for this directory.
+  folder: "logs"
+  
+  # Logging level. Options include DEBUG, INFO, WARNING, ERROR, CRITICAL.
+  # DEBUG: Detailed information, typically of interest only when diagnosing problems.
+  # INFO: Confirmation that things are working as expected.
+  # WARNING: An indication that something unexpected happened.
+  # ERROR: Due to a more serious problem, the software has not been able to perform some function.
+  # CRITICAL: A serious error indicating that the program itself may be unable to continue running.
+  level: "INFO"
+
+# === Backup Configuration ===
+backup:
+  # Directory where backup files will be stored.
+  # Ensure that the application has write permissions for this directory.
+  folder: "backups"
+  
+  # Schedule for backups using cron syntax.
+  # Example: "0 2 * * *" means daily backups at 2 AM.
+  schedule: "0 2 * * *"  # Adjust the schedule as needed.
+
+# === Additional Configurations ===
+# You can add more configurations below as your application grows.
+
+# Example: Administrator Email
+# admin:
+#   email: "admin@example.com"
+
+# Example: Security Settings
+# security:
+#   enable_https: true
+#   allowed_ips:
+#     - "192.168.1.100"
+#     - "192.168.1.101"

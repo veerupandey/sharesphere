@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "sharesphere"
+version = "1.0.0"
+description = "A multi-user, permission-based file sharing application using Streamlit."
+authors = ["Rakesh Pandey <rakeshpandey820@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+streamlit = "^1.24.1"
+sqlalchemy = "^1.4.47"
+bcrypt = "^4.0.1"
+PyYAML = "^6.0"
+python-dotenv = "^1.0.0"
+pydantic = "^1.10.7"
+uvicorn = "^0.22.0"
+fastapi = "^0.95.1"
+watchdog = "^3.0.0"
+omegaconf = "^2.3.0"
+
+[poetry.group.dev.dependencies]
+pytest = "^7.2.0"
+pytest-cov = "^4.0.0"
+coverage = "^6.5.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+# Include data files
+include = [
+    "config/config.yaml",
+    "sharesphere/templates/*",
+    "LICENSE",
+    "README.md"
+]

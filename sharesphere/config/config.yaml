@@ -1,0 +1,30 @@
+# config/config.yaml
+
+# Database settings
+db:
+  url: "sqlite:///sharesphere.db"  # Adjust the path as needed
+
+# File upload settings
+upload:
+  folder: "uploads"
+  allowed_extensions:
+    - png
+    - jpg
+    - jpeg
+    - gif
+    - pdf
+    - txt
+    - docx
+    - xlsx
+    - pptx
+  max_file_size: 52428800  # 50 MB in bytes
+
+# Logging settings
+logging:
+  folder: "logs"
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# Backup settings
+backup:
+  folder: "backups"
+  schedule: "0 2 * * *"  # Cron schedule for daily backups at 2 AM
