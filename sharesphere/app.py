@@ -3,7 +3,7 @@ import logging
 import os
 import base64
 import pandas as pd
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from sqlalchemy.orm import joinedload
 from sharesphere.auth import authenticate_user, get_user_by_username
 from sharesphere.file_manager import upload_file, get_shared_files, delete_file
@@ -18,6 +18,7 @@ from sharesphere.admin import (
     list_group_requests,
     approve_group_request,
     reject_group_request,
+    update_config
 )
 from sharesphere.config import load_config
 from sharesphere.database import SessionLocal
@@ -32,7 +33,15 @@ st.set_page_config(
 )
 
 # === Load Configuration ===
-config: DictConfig = load_config()
+config_path = os.getenv("SHARESPHERE_CONFIG_PATH", None)
+try:
+    config: DictConfig = load_config(config_path)
+except FileNotFoundError as e:
+    st.error(f"Configuration file not found: {e}")
+    st.stop()
+except Exception as e:
+    st.error(f"Failed to load configuration: {e}")
+    st.stop()
 
 # === Initialize Logging ===
 logger = logging.getLogger(__name__)
@@ -61,11 +70,10 @@ if 'authentication_status' not in st.session_state:
     st.session_state['user_id'] = None
     st.session_state['username'] = None
     st.session_state['is_admin'] = False
-    st.session_state['dark_mode'] = False  # Initialize dark mode preference
 
 # === Custom CSS Styling ===
-def inject_css(dark_mode=False):
-    """Inject custom CSS and JavaScript for Dark Mode toggling."""
+def inject_css():
+    """Inject custom CSS for styling."""
     css = """
     <style>
     /* Center Align Titles */
@@ -149,71 +157,17 @@ def inject_css(dark_mode=False):
         visibility: visible;
         opacity: 1;
     }
-
-    /* Header Image Styling */
-    .header-img {
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-        width: 150px;
-    }
-
-    /* Dark Mode Styles */
-    body.dark-mode, .css-18e3th9.dark-mode, .css-1d391kg.dark-mode {
-        background-color: #121212 !important;
-        color: #FFFFFF !important;
-    }
-    .dark-mode .css-1aumxhk.edgvbvh3 {
-        background-color: #333333 !important;
-        color: #FFFFFF !important;
-    }
-    .dark-mode .stDataFrame th {
-        background-color: #1E1E1E !important;
-        color: #FFFFFF !important;
-    }
-    .dark-mode .stDataFrame tr:nth-child(even){
-        background-color: #1A1A1A !important;
-    }
-    .dark-mode .stDataFrame tr:hover {
-        background-color: #333333 !important;
-    }
     </style>
     """
 
     st.markdown(css, unsafe_allow_html=True)
 
-    if dark_mode:
-        # Inject JavaScript to add 'dark-mode' class
-        js = """
-        <script>
-        if (!document.body.classList.contains('dark-mode')) {
-            document.body.classList.add('dark-mode');
-        }
-        </script>
-        """
-    else:
-        # Inject JavaScript to remove 'dark-mode' class
-        js = """
-        <script>
-        if (document.body.classList.contains('dark-mode')) {
-            document.body.classList.remove('dark-mode');
-        }
-        </script>
-        """
-
-    st.markdown(js, unsafe_allow_html=True)
-
+# Ensure CSS is applied
 inject_css()
 
 # === Header with Logo and Welcome Message ===
 def display_header():
-    """Display the header with logo and welcome messages."""
-    st.image(
-        "https://via.placeholder.com/150",
-        width=150,
-        use_container_width=False,  # Replaced the deprecated use_column_width parameter
-        output_format="PNG"
-    )  # Replace with your logo URL or local path
+    """Display the header with welcome messages."""
     st.markdown("---")
     st.markdown("<h1>🔒 ShareSphere</h1>", unsafe_allow_html=True)
     st.markdown("<h2>The Ultimate Multi-User File Sharing Platform</h2>", unsafe_allow_html=True)
@@ -242,11 +196,9 @@ def login():
             st.session_state['user_id'] = user.id
             st.session_state['username'] = user.username
             st.session_state['is_admin'] = is_admin
-            st.session_state['dark_mode'] = user.dark_mode_pref  # Load user preference
             st.success(f"✅ Logged in as **{username}**!")
             logger.info(f"User '{username}' logged in.")
-            # Re-inject CSS based on preference
-            inject_css(dark_mode=user.dark_mode_pref)
+            st.rerun()  # Force a rerun to update the session state
         else:
             st.error("⚠️ Incorrect username or password.")
             logger.warning(f"Failed login attempt for username '{username}'.")
@@ -259,11 +211,11 @@ def logout():
     st.session_state['user_id'] = None
     st.session_state['username'] = None
     st.session_state['is_admin'] = False
-    st.session_state['dark_mode'] = False
     st.success("✅ Logged out successfully.")
     logger.info("User logged out.")
-    # Refresh the app by clearing the cache (as a workaround since we can't rerun)
-    st.experimental_set_query_params()  # Reset query parameters to force rerun
+    # Clear query parameters and force a rerun
+    st.query_params.clear()
+    st.rerun()
 
 
 # === Function to Generate Download Links ===
@@ -343,20 +295,22 @@ def upload_interface(user_id, username):
         )
         selected_users = []
 
-    uploaded_files = st.file_uploader(
-        "Select files to upload",
-        type=None,
-        accept_multiple_files=True,
-        help="Upload multiple files by holding down the Ctrl or Command key.",
-        key="upload_files"
-    )
-    file_comment = st.text_area(
-        "Add a comment about the file (optional)",
-        max_chars=200,
-        help="Provide a brief description or note about the uploaded files."
-    )
+    with st.form("upload_form"):
+        uploaded_files = st.file_uploader(
+            "Select files to upload",
+            type=None,
+            accept_multiple_files=True,
+            help="Upload multiple files by holding down the Ctrl or Command key.",
+            key="upload_files"
+        )
+        file_comment = st.text_area(
+            "Add a comment about the file (optional)",
+            max_chars=200,
+            help="Provide a brief description or note about the uploaded files."
+        )
+        submit = st.form_submit_button("Upload Files")
 
-    if uploaded_files:
+    if submit and uploaded_files:
         db = SessionLocal()
         if share_option == "Share with Specific Users":
             selected_user_objs = db.query(User).filter(User.username.in_(selected_users)).all()
@@ -485,13 +439,13 @@ def notify_sender(sender_id, downloader_id, filename):
 
 # === Admin Panel Interface with Enhanced Features ===
 def admin_interface():
-    """Provide the admin panel for managing users, files, groups, and logs."""
+    """Provide the admin panel for managing users, files, groups, logs, and configuration."""
     st.header("🛠️ Admin Panel")
     st.markdown("<style> .big-font {font-size:20px !important;}</style>", unsafe_allow_html=True)
-    st.markdown('<p class="big-font">Manage users, files, groups, and monitor system logs seamlessly.</p>', unsafe_allow_html=True)
+    st.markdown('<p class="big-font">Manage users, files, groups, monitor system logs, and update configuration.</p>', unsafe_allow_html=True)
 
     # Tabs for different admin functionalities with Icons
-    admin_tabs = st.tabs(["👥 Manage Users", "📂 Manage Files", "👥 Manage Groups", "📈 View Logs"])
+    admin_tabs = st.tabs(["👥 Manage Users", "📂 Manage Files", "👥 Manage Groups", "📈 View Logs", "⚙️ Configuration"])
 
     # === Manage Users Tab ===
     with admin_tabs[0]:
@@ -696,6 +650,130 @@ def admin_interface():
         else:
             st.info("📜 No logs available.")
 
+    # === Configuration Tab ===
+    with admin_tabs[4]:
+        st.subheader("⚙️ Configuration")
+        st.markdown("Update the system configuration settings.")
+
+        # Load current configuration with a new variable name to avoid shadowing
+        config_path = os.getenv("SHARESPHERE_CONFIG_PATH", None)
+        try:
+            new_config: DictConfig = load_config(config_path)
+        except FileNotFoundError as e:
+            st.error(f"Configuration file not found: {e}")
+            return
+        except Exception as e:
+            st.error(f"Failed to load configuration: {e}")
+            return
+
+        # Display current configuration settings
+        st.write("### Current Configuration")
+        st.json(OmegaConf.to_container(new_config, resolve=True))
+
+        st.write("---")
+
+        # Update allowed extensions
+        st.write("### Update Allowed Extensions")
+        allowed_extensions = st.text_area(
+            "Allowed Extensions (comma-separated)",
+            value=", ".join(new_config.upload.allowed_extensions),
+            help="Enter the allowed file extensions separated by commas."
+        )
+
+        # Update maximum file size
+        st.write("### Update Maximum File Size")
+        max_file_size = st.number_input(
+            "Maximum File Size (in bytes)",
+            value=new_config.upload.max_file_size,
+            help="Enter the maximum allowed file size for uploads in bytes."
+        )
+
+        # Update database URL
+        st.write("### Update Database URL")
+        db_url = st.text_input(
+            "Database URL",
+            value=new_config.db.url,
+            help="Enter the database URL following SQLAlchemy's format."
+        )
+
+        # Update upload folder
+        st.write("### Update Upload Folder")
+        upload_folder = st.text_input(
+            "Upload Folder",
+            value=new_config.upload.folder,
+            help="Enter the directory where uploaded files will be stored."
+        )
+
+        # Update log folder
+        st.write("### Update Log Folder")
+        log_folder = st.text_input(
+            "Log Folder",
+            value=new_config.logging.folder,
+            help="Enter the directory where log files will be stored."
+        )
+
+        # Update logging level
+        st.write("### Update Logging Level")
+        log_level = st.selectbox(
+            "Logging Level",
+            ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            index=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"].index(new_config.logging.level.upper())
+        )
+
+        # Update backup folder
+        st.write("### Update Backup Folder")
+        backup_folder = st.text_input(
+            "Backup Folder",
+            value=new_config.backup.folder,
+            help="Enter the directory where backup files will be stored."
+        )
+
+        # Update backup schedule
+        st.write("### Update Backup Schedule")
+        backup_schedule = st.text_input(
+            "Backup Schedule (cron syntax)",
+            value=new_config.backup.schedule,
+            help="Enter the schedule for backups using cron syntax."
+        )
+
+        # Save updated configuration
+        if st.button("Save Configuration"):
+            # Validate and construct the updated configuration
+            updated_config = {
+                "db": {
+                    "url": db_url
+                },
+                "upload": {
+                    "folder": upload_folder,
+                    "allowed_extensions": [ext.strip() for ext in allowed_extensions.split(",")],
+                    "max_file_size": max_file_size
+                },
+                "logging": {
+                    "folder": log_folder,
+                    "level": log_level.upper()
+                },
+                "backup": {
+                    "folder": backup_folder,
+                    "schedule": backup_schedule
+                }
+            }
+
+            # Attempt to merge with existing config to preserve any additional configurations
+            try:
+                # Load existing config to preserve additional settings
+                merged_config = OmegaConf.create(updated_config)
+                # Save the merged configuration
+                success = update_config(merged_config)
+                if success:
+                    st.success("✅ Configuration updated successfully.")
+                    # Reload the config
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to update configuration.")
+            except Exception as e:
+                st.error(f"❌ An error occurred while updating the configuration: {e}")
+                logger.error(f"Error updating configuration: {e}")
+
 
 # === User Settings Interface ===
 def user_settings_interface(user_id: int):
@@ -708,30 +786,6 @@ def user_settings_interface(user_id: int):
 
     db = SessionLocal()
     user = db.query(User).filter(User.id == user_id).first()
-
-    # -------------- Dark Mode Toggle -------------- #
-    st.subheader("Appearance")
-    # Check if dark_mode_pref is stored in the user’s DB entry
-    current_dark_mode = user.dark_mode_pref if hasattr(user, "dark_mode_pref") else False
-
-    # Provide a checkbox for toggling dark mode
-    dark_mode_enabled = st.checkbox(
-        "Enable Dark Mode",
-        value=current_dark_mode,
-        help="Toggle dark mode for a more comfortable low-light experience."
-    )
-
-    # If user toggles the checkbox, update the database and apply CSS
-    if dark_mode_enabled != current_dark_mode:
-        # Update DB
-        user.dark_mode_pref = dark_mode_enabled
-        db.commit()
-        db.refresh(user)
-        st.session_state['dark_mode'] = dark_mode_enabled  # Update session state
-        inject_css(dark_mode=dark_mode_enabled)  # Apply CSS
-
-    # Inject custom CSS if dark mode is on or off
-    inject_css(dark_mode=st.session_state['dark_mode'])
 
     st.write("---")
 
@@ -867,7 +921,7 @@ def user_groups_interface(user_id):
             existing_request = db.query(GroupRequest).filter(
                 GroupRequest.user_id == user_id,
                 GroupRequest.group_id == group.id,
-                GroupRequest.status == "Pending"
+                GroupRequest.status == "pending"
             ).first()
             if existing_request:
                 st.warning(f"⚠️ You have already requested to join '{selected_group}'. Please wait for approval.")
@@ -890,10 +944,9 @@ def main():
         user_id = st.session_state['user_id']
         username = st.session_state['username']
         is_admin = st.session_state['is_admin']
-        dark_mode = st.session_state.get('dark_mode', False)
 
-        # Ensure CSS is applied based on user preference
-        inject_css(dark_mode=dark_mode)
+        # Ensure CSS is applied
+        inject_css()
 
         # Navigation Sidebar with Icons and Tooltips
         nav_options = ["📤 Upload Files", "📥 Download Files", "👥 Your Groups", "⚙️ User Settings"]

@@ -5,7 +5,7 @@ db:
   # Database URL following SQLAlchemy's format.
   # For SQLite (default), the path is relative to the project root.
   # Ensure that the specified path is correct and accessible.
-  url: "sqlite:///../sharesphere.db"  # Adjust the path as needed.
+  url: "sqlite:///sharesphere.db"  # Adjust the path as needed.
 
 # === File Upload Settings ===
 upload:
@@ -67,3 +67,5 @@ backup:
 #   allowed_ips:
 #     - "192.168.1.100"
 #     - "192.168.1.101"
+
+# This file is a duplicate and not required. It can be deleted.

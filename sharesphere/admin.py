@@ -3,6 +3,8 @@
 from .database import SessionLocal
 from .models import User, File, FileSharing, Group, GroupRequest
 from .auth import create_user, get_user_by_username, update_user_password
+from .config import load_config
+from omegaconf import OmegaConf
 import logging
 import os
 
@@ -123,3 +125,25 @@ def reject_group_request(request_id: int):
         return True, "Group request rejected."
     db.close()
     return False, "Group request not found."
+
+def update_config(new_config):
+    """
+    Update the configuration file with new settings.
+    
+    Args:
+        new_config (dict): New configuration settings.
+    
+    Returns:
+        bool: True if the update was successful, False otherwise.
+    """
+    config_path = os.getenv("SHARESPHERE_CONFIG_PATH", None)
+    if not config_path:
+        config_path = Path(os.getcwd()) / "config.yaml"
+    
+    try:
+        OmegaConf.save(config=OmegaConf.create(new_config), f=config_path)
+        logger.info("Configuration updated successfully.")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to update configuration: {e}")
+        return False
