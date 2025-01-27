@@ -66,7 +66,7 @@ sharesphere start
 1. Clone the repository:
 
 ```sh
-git clone https://github.com/yourusername/sharesphere.git
+git clone https://github.com/veerupandey/sharesphere.git
 cd sharesphere
 ```
 
