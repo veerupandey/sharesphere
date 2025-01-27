@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sharesphere"
-version = "0.1.0"
+version = "1.0.1"
 description = "A multi-user file sharing system built with Streamlit, SQLAlchemy, and SQLite."
 authors = ["Rakesh <rakeshpandey820@gmail.com>"]
 license = "MIT"
